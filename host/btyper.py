@@ -1,4 +1,4 @@
-from evdev import InputDevice, categorize, KeyEvent
+from evdev import InputDevice, categorize, KeyEvent, list_devices
 import time
 import os
 from argparse import ArgumentParser
@@ -90,22 +90,57 @@ class WMPWatcher:
             self.update_state()
             time.sleep(how_often)
 
+    @classmethod
+    def autodiscover(cls):
+        """
+        Auto discovers connected devices
+        """
+        devices = [InputDevice(d) for d in list_devices()]
+        print("Now, start typing and type untill we say you not to!")
+        time.sleep(2)
+        print("You can stop typing now!")
+
+        found_device = None
+        for device in devices:
+            _event = device.read_one()  # sync event
+            _event = device.read_one()
+
+            if not _event:
+                continue
+
+            event = categorize(_event)
+            if not isinstance(event, KeyEvent):
+                continue
+
+            found_device = device
+
+        assert found_device is not None, "Keyboard not detected! Try better!"
+        return found_device
+
 
 if __name__ == "__main__":
     from pico_updater import send_updates
 
     parser = ArgumentParser()
-    parser.add_argument("device")
+    parser.add_argument(
+        "--device", "-d", required=False, help="Input device (keyboard)"
+    )
+    parser.add_argument("--port", "-p", required=False, help="TTY port for pico")
     args = parser.parse_args()
-    device = InputDevice(args.device)
-    watcher = WMPWatcher()
+    device = None
 
-    port = None
+    if args.device:
+        device = InputDevice(args.device)
+    else:
+        device = WMPWatcher.autodiscover()
+
+    port = args.port
     for p in os.listdir("/dev"):
         if p.startswith("ttyACM"):
             port = f"/dev/{p}"
             break
 
+    watcher = WMPWatcher()
     watching_thread = Thread(target=watcher.watch_events, args=[device])
     watching_thread.start()
     updating_thread = Thread(target=watcher.watch_state)
