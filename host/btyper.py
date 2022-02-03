@@ -102,17 +102,17 @@ class WMPWatcher:
 
         found_device = None
         for device in devices:
-            _event = device.read_one()  # sync event
-            _event = device.read_one()
+            for _ in range(5):
+                _event = device.read_one()
 
-            if not _event:
-                continue
+                if not _event:
+                    continue
 
-            event = categorize(_event)
-            if not isinstance(event, KeyEvent):
-                continue
+                event = categorize(_event)
+                if not isinstance(event, KeyEvent):
+                    continue
 
-            found_device = device
+                found_device = device
 
         assert found_device is not None, "Keyboard not detected! Try better!"
         return found_device
